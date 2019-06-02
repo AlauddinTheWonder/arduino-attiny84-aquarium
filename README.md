@@ -1,9 +1,3 @@
-/* 
- * Alauddin Ansari
- * 2019-06-01
- * ATtiny84 Low-Powered Aquarium Automation
- */
-
 # Arduino / AtTiny84 / Aquarium Automation
 Aquarium automation with 1 food and 3 switch control i.e. Food, Filter, Light and one additional switch.
 
@@ -23,3 +17,7 @@ AtTiny84 Pin configuration:
 ---------------------------------------------
 
 Root folder name: _*Aquarium-AtTiny84*_
+
+* Alauddin Ansari
+* 2019-06-01
+* ATtiny84 Low-Powered Aquarium Automation
