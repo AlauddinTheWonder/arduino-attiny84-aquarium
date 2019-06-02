@@ -18,6 +18,10 @@ int last_hour = -1;           // Last hour to compare current hour change, used 
 int last_date = 0;            // Last date to compare date change, used to drop food multiple time a day.
 boolean initialized = false;  // Flag to check whether running first time after powering up, used in sync time drift.
 
+// Battery
+const float minVolt = 2.0;
+const float maxVolt = 4.2;
+
 /* 
  * Pins Setting
  * -------------------------
@@ -32,6 +36,7 @@ const int ThirdSwitchPin = 3;     // Third Pin
 
 const int PowerIndicPin = 5;      // Power Indicator Pin
 const int MainPowerPin = 7;       // Main Power Switch Pin
+const int BatteryRechargePin = 8; // Batter Recharge Switch Pin
 
 // Time schedule (in Hour) -- Same on and off value means disable
 const int Filter_on = 5;
@@ -55,6 +60,7 @@ void setup() {
   pinMode(ThirdSwitchPin, OUTPUT);
   pinMode(PowerIndicPin, OUTPUT);
   pinMode(MainPowerPin, OUTPUT);
+  pinMode(BatteryRechargePin, OUTPUT);
 
   digitalWrite(FoodPin, LOW);
   digitalWrite(FilterPin, LOW);
@@ -62,6 +68,7 @@ void setup() {
   digitalWrite(ThirdSwitchPin, LOW);
   digitalWrite(PowerIndicPin, HIGH);
   digitalWrite(MainPowerPin, LOW);
+  digitalWrite(BatteryRechargePin, LOW);
 
   delay(100);
   connectDS1307();
@@ -82,7 +89,7 @@ void loop() {
       int _hour = hour();
       int _min = minute();
   
-      // Dropping food
+      // Dropping food logic
       for(int i = 0; i < FoodDose_count; i++)
       {
         int food_hour = FoodDose_at[i];
@@ -96,7 +103,7 @@ void loop() {
         }
       }
   
-      // Filter program
+      // Filter switch logic
       if (FoodDropped_at == _hour && _min < 30) {
         // Switch off filter during food hour.
         // It helps fish to eat food without disturbance by water flow.
@@ -107,7 +114,7 @@ void loop() {
       }
       delay(100);
   
-      // Light program
+      // Light switch logic
       if (FoodDropped_at == _hour && _min < 30) {
         // Switch on light during food hour.
         digitalWrite(LightPin, HIGH);
@@ -117,15 +124,26 @@ void loop() {
       }
       delay(100);
 
-      // Third switch program
+      // Third pin switch logic
       int thirdSwitchStatus = getOnOffStatus(_hour, ThirdSwitch_on, ThirdSwitch_off);
       if (thirdSwitchStatus == 1) {
         digitalWrite(ThirdSwitchPin, thirdSwitchStatus);
         delay(100);
       }
 
+      // Batter recharge logic
+      double currentVolt = double( readVcc() ) / 1000;
+      currentVolt = constrain(currentVolt, minVolt, maxVolt);
+      int voltPercent = mapf(currentVolt, minVolt, maxVolt, 0.0, 100.0);
+      if (voltPercent <= 10) {
+        digitalWrite(BatteryRechargePin, HIGH);
+      }
+      if (voltPercent >= 80) {
+        digitalWrite(BatteryRechargePin, LOW);
+      }
+
       // Check whether main power supply should switch on.
-      if (digitalRead(FilterPin) == LOW && digitalRead(LightPin) == LOW && digitalRead(ThirdSwitchPin) == LOW) {
+      if (digitalRead(FilterPin) == LOW && digitalRead(LightPin) == LOW && digitalRead(ThirdSwitchPin) == LOW && digitalRead(BatteryRechargePin) == LOW) {
         digitalWrite(MainPowerPin, LOW);
       } else {
         digitalWrite(MainPowerPin, HIGH);
