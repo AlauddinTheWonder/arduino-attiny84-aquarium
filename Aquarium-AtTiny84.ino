@@ -16,9 +16,10 @@ const int wtd_cnt_reset = 40; // Actual task will be executed after this counter
 int wtd_cnt = 0;              // Counter for task execution comparision.
 int last_hour = -1;           // Last hour to compare current hour change, used in sync time drift.
 int last_date = 0;            // Last date to compare date change, used to drop food multiple time a day.
-boolean initialized = false;  // Flag to check whether running first time after powering up, used in sync time drift.
+bool hour_changed = false;    // If hour changed.
+bool initialized = false;     // Flag to check whether running first time after powering up, used in sync time drift.
 
-// Battery
+// Battery recharge criteria
 const float minVolt = 2.0;
 const float maxVolt = 4.2;
 
@@ -36,7 +37,8 @@ const int ThirdSwitchPin = 3;     // Third Pin
 
 const int PowerIndicPin = 5;      // Power Indicator Pin
 const int MainPowerPin = 7;       // Main Power Switch Pin
-const int BatteryRechargePin = 8; // Batter Recharge Switch Pin
+const int BatteryRechargePin = 8; // Battery Recharge Switch Pin
+const int RechargeIndicPin = 9;   // Battery Recharging Indicator Pin
 
 // Time schedule (in Hour) -- Same on and off value means disable
 const int Filter_on = 5;
@@ -48,6 +50,7 @@ const int Light_off = 19;
 const int ThirdSwitch_on = 0;
 const int ThirdSwitch_off = 0;
 
+// food drop settings
 const int FoodDose_at[] = {8, 18};        // Array: Drop food at multiple times
 const int FoodDropQty[] = {1000, 600};    // Microseconds till what DC motor will run to drop food. More value, more food.
 const int FoodDose_count = 2;             // Size of array count
@@ -61,14 +64,16 @@ void setup() {
   pinMode(PowerIndicPin, OUTPUT);
   pinMode(MainPowerPin, OUTPUT);
   pinMode(BatteryRechargePin, OUTPUT);
+  pinMode(RechargeIndicPin, OUTPUT);
 
   digitalWrite(FoodPin, LOW);
   digitalWrite(FilterPin, LOW);
   digitalWrite(LightPin, LOW);
   digitalWrite(ThirdSwitchPin, LOW);
-  digitalWrite(PowerIndicPin, HIGH);
+  digitalWrite(PowerIndicPin, HIGH); // auto on as soon as controller starts
   digitalWrite(MainPowerPin, LOW);
   digitalWrite(BatteryRechargePin, LOW);
+  digitalWrite(RechargeIndicPin, LOW);
 
   delay(100);
   connectDS1307();
@@ -88,6 +93,11 @@ void loop() {
       int _date = day();
       int _hour = hour();
       int _min = minute();
+
+      if (_hour != last_hour) {
+        hour_changed = true;
+        last_hour = _hour;
+      }
   
       // Dropping food logic
       for(int i = 0; i < FoodDose_count; i++)
@@ -131,15 +141,23 @@ void loop() {
         delay(100);
       }
 
-      // Batter recharge logic
-      double currentVolt = double( readVcc() ) / 1000;
-      currentVolt = constrain(currentVolt, minVolt, maxVolt);
-      int voltPercent = mapf(currentVolt, minVolt, maxVolt, 0.0, 100.0);
-      if (voltPercent <= 10) {
-        digitalWrite(BatteryRechargePin, HIGH);
-      }
-      if (voltPercent >= 80) {
+      if (hour_changed) {
+        // Batter recharge logic
         digitalWrite(BatteryRechargePin, LOW);
+        delay(1000);
+        
+        double currentVolt = double( readVcc() ) / 1000;
+        currentVolt = constrain(currentVolt, minVolt, maxVolt);
+        int voltPercent = mapf(currentVolt, minVolt, maxVolt, 0.0, 100.0);
+        
+        if (voltPercent <= 10) {
+          digitalWrite(BatteryRechargePin, HIGH);
+          digitalWrite(RechargeIndicPin, HIGH);
+        }
+        if (voltPercent >= 80) {
+          digitalWrite(BatteryRechargePin, LOW);
+          digitalWrite(RechargeIndicPin, LOW);
+        }
       }
 
       // Check whether main power supply should switch on.
@@ -149,29 +167,27 @@ void loop() {
         digitalWrite(MainPowerPin, HIGH);
       }
       
-  
+
+      /*
       // Additional settings
       // Delay time to sync drifted time in RTC module
-      /*
-      if (_hour != last_hour) {
-        if (initialized) { // Ignore initial call.
-          
-          // Sync drifted time
-          // Param: drifted second(s) in an hour.
-          // Must be less than 60 seconds.
-          // In TimeFunctions.ino file
-          int driftedSec = getDriftedTime();
-          if (driftedSec > 0) {
-            syncDriftedTime(driftedSec);
-            // Update RTC module time with adjusted time
-            RTC.set(now());
-          }
+      
+      if (hour_changed && initialized) { // Ignore initial call.
+        // Sync drifted time
+        // Param: drifted second(s) in an hour.
+        // Must be less than 60 seconds.
+        // In TimeFunctions.ino file
+        int driftedSec = getDriftedTime();
+        if (driftedSec > 0) {
+          syncDriftedTime(driftedSec);
+          // Update RTC module time with adjusted time
+          RTC.set(now());
         }
-        last_hour = _hour;
       }
       */
-  
+ 
       initialized = true;
+      hour_changed = false;
     }
   }
   
