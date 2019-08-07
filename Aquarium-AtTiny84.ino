@@ -150,7 +150,7 @@ void loop() {
         currentVolt = constrain(currentVolt, minVolt, maxVolt);
         int voltPercent = mapf(currentVolt, minVolt, maxVolt, 0.0, 100.0);
         
-        if (voltPercent <= 10) {
+        if (voltPercent <= 20) {
           digitalWrite(BatteryRechargePin, HIGH);
           digitalWrite(RechargeIndicPin, HIGH);
         }
